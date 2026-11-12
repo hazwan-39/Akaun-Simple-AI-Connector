@@ -10,3 +10,16 @@ coverage/
 !tests/fixtures/**/*.xlsx
 .DS_Store
 .claude/launch.json
+
+# Laravel app (apps/)
+apps/vendor/
+apps/node_modules/
+apps/public/build/
+apps/.env
+apps/storage/logs/*.log
+apps/storage/framework/cache/data/
+apps/storage/framework/sessions/
+apps/storage/framework/views/
+apps/.phpunit.cache/
+*.DS_Store
+Thumbs.db

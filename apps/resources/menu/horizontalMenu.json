@@ -1,0 +1,16 @@
+{
+  "menu": [
+    {
+      "name": "Dashboard",
+      "icon": "menu-icon icon-base ri ri-home-smile-line",
+      "slug": "dashboard",
+      "url": "dashboard"
+    },
+    {
+      "name": "My Profile",
+      "icon": "menu-icon icon-base ri ri-user-line",
+      "slug": "profile",
+      "url": "profile"
+    }
+  ]
+}
