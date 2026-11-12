@@ -1,0 +1,30 @@
+{
+  "name": "@akaun/excel-addin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Akaun Simple AI - Microsoft Excel task pane add-in (React + Office.js)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "validate:manifest": "office-addin-manifest validate manifest.dev.xml",
+    "sideload": "office-addin-debugging start manifest.dev.xml desktop --app excel",
+    "sideload:stop": "office-addin-debugging stop manifest.dev.xml"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@akaun/shared": "1.0.0",
+    "@types/office-js": "^1.0.449",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "office-addin-debugging": "^6.0.3",
+    "office-addin-dev-certs": "^2.0.3",
+    "office-addin-manifest": "^2.0.3",
+    "vite": "^5.4.11"
+  }
+}

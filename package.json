@@ -1,0 +1,31 @@
+{
+  "name": "akaun-simple-ai-connector",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Akaun Simple AI Connector - Excel add-in + self-hosted AI API (Phase 1 MVP)",
+  "workspaces": [
+    "packages/shared",
+    "apps/api",
+    "apps/excel-addin"
+  ],
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "dev:api": "npm run dev -w @akaun/api",
+    "dev:addin": "npm run dev -w @akaun/excel-addin",
+    "build": "npm run build -w @akaun/api && npm run build -w @akaun/excel-addin",
+    "typecheck": "tsc -p packages/shared --noEmit && tsc -p apps/api --noEmit && tsc -p apps/excel-addin --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "keygen": "node scripts/generate-pilot-key.mjs",
+    "manifests": "node scripts/build-manifests.mjs",
+    "icons": "node scripts/generate-icons.mjs",
+    "certs": "npx office-addin-dev-certs install"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.7"
+  }
+}

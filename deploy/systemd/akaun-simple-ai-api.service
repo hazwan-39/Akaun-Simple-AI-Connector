@@ -1,0 +1,41 @@
+# /etc/systemd/system/akaun-simple-ai-api.service
+# Isolated Node.js service for the Akaun Simple AI API. Does not depend on or
+# restart any other service on the server.
+[Unit]
+Description=Akaun Simple AI Connector API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=akaunai
+Group=akaunai
+WorkingDirectory=/home/akaunai/apps/akaun-simple-ai/current/apps/api
+EnvironmentFile=/etc/akaun-simple-ai/api.env
+ExecStart=/usr/bin/node dist/server.js
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=120
+StartLimitBurst=5
+TimeoutStopSec=15
+
+# Logs go to journald (structured JSON, no financial data). See deploy/journald/.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=akaun-simple-ai-api
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadOnlyPaths=/home/akaunai/apps/akaun-simple-ai
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target
