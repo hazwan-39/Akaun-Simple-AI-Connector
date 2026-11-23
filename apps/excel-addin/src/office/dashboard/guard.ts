@@ -25,12 +25,12 @@ export const SHEET_BOUNDS: Record<string, CellRect> = {
   [AI_DASHBOARD_SHEET]: parseAddress("A1:N90")!,
   [AI_DATA_SHEET]: parseAddress("A1:J40")!,
   // Bank import (BANK_IMPORT_001)
-  [BANK_LEDGER_SHEET]: parseAddress("A1:M5001")!,
+  [BANK_LEDGER_SHEET]: parseAddress("A1:N5001")!,
   [BANK_TRANSFER_SHEET]: parseAddress("A1:AQ400")!,
   [BANK_LISTS_SHEET]: parseAddress("A1:B80")!,
 };
 
-const ALLOWED_FUNCTIONS = new Set(["SUM", "IF", "IFERROR", "ROUND", "ABS", "MAX", "MIN", "AVERAGE", "COUNT", "ISNUMBER", "AND", "OR", "NOT"]);
+const ALLOWED_FUNCTIONS = new Set(["SUM", "IF", "IFERROR", "ROUND", "ABS", "MAX", "MIN", "AVERAGE", "COUNT", "ISNUMBER", "AND", "OR", "NOT", "ROW"]);
 const MAX_OPS = 500;
 
 function checkAddress(sheet: string, address: string): CellRect {

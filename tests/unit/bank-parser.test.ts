@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLines, parseAmountToken, parseBankStatement, parseDateToken, type PdfTextItem } from "@akaun/shared";
+import { buildLines, parseAmountToken, parseBankStatement, parseDateToken, shortDescription, type PdfTextItem } from "@akaun/shared";
 
 /**
  * All fixtures here are synthetic. They imitate the layouts seen in real Malaysian statements
@@ -51,6 +51,29 @@ describe("parseDateToken", () => {
 
   it.each(["32/01/23", "01/13/23", "704747800000501", "Total"])("rejects %s", (raw) => {
     expect(parseDateToken(raw, true)).toBeNull();
+  });
+});
+
+describe("shortDescription", () => {
+  it.each([
+    ["DR MYDEBIT 625843 550989XXXXXX4807 DREAMIAL HOLDINGS S5 090323 KLANG 000000003580", "DR MYDEBIT DREAMIAL HOLDINGS S5 KLANG"],
+    ["FPX PAYMENT FR A/ 20230201M0000061861* SHOPEE PAY 2302011448243324", "FPX PAYMENT FR A/ SHOPEE PAY"],
+    ["Reference Number: 579040443 MB DuitNow (ACC NO) Fund Transfer", "MB DuitNow (ACC NO) Fund Transfer"],
+    ["04572 SALES DEBIT", "SALES DEBIT"],
+    ["SERVICE CHARGE", "SERVICE CHARGE"],
+  ])("%s", (full, short) => {
+    expect(shortDescription(full)).toBe(short);
+  });
+
+  it("never exceeds the template's Butiran width and cuts at a word boundary", () => {
+    const s = shortDescription("INSTANT TRANSFER TO ACCOUNT HOLDER WITH A VERY LONG COMPANY NAME SDN BHD");
+    expect(s.length).toBeLessThanOrEqual(43);
+    expect("INSTANT TRANSFER TO ACCOUNT HOLDER WITH A VERY LONG COMPANY NAME SDN BHD".startsWith(s)).toBe(true);
+    expect(s.endsWith(" ")).toBe(false);
+  });
+
+  it("falls back to a truncated first token when everything looks like a reference", () => {
+    expect(shortDescription("20230201M0000061861")).toBe("20230201M0000061861");
   });
 });
 

@@ -47,6 +47,18 @@ export class OfficeWorkbookPort implements WorkbookPort {
     });
   }
 
+  async readFormulas(sheet: string, address: string): Promise<unknown[][]> {
+    return Excel.run(async (ctx) => {
+      const ws = ctx.workbook.worksheets.getItemOrNullObject(sheet);
+      await ctx.sync();
+      if (ws.isNullObject) throw new Error(`Sheet not found: ${sheet}`);
+      const r = ws.getRange(address);
+      r.load("formulas");
+      await ctx.sync();
+      return r.formulas as unknown[][];
+    });
+  }
+
   async getOwnershipTag(sheet: string): Promise<string | null> {
     return Excel.run(async (ctx) => {
       const ws = ctx.workbook.worksheets.getItemOrNullObject(sheet);

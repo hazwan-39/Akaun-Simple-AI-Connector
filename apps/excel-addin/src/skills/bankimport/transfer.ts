@@ -3,19 +3,21 @@
  *
  * The add-in NEVER writes to Deposits or Payments. It prepares a block on its own sheet laid out exactly
  * like the target columns, selects it for the user to copy, and after the user's
- * Paste Special → Values + Skip blanks it reads the target back and compares every cell.
+ * Paste Special → Formulas it reads the target back and compares every cell.
  *
  * Rules taken from the template's VBA forms (docs/spec-bank-statement-import.md §11):
  *  - the forms put the next entry at COUNTA(column A) + 1, so the block starts there and fills column A
- *    (date for Deposits, No. = row − 5 for Payments) or the next form entry would overwrite it;
- *  - the total column (Deposits C, Payments D) holds the workbook's SUM formula and is left blank in the
- *    block so Skip blanks keeps it.
+ *    (date for Deposits; for Payments the same `=ROW()-5` formula the form writes);
+ *  - the total column (Deposits C, Payments D) carries the template's own `=SUM(...)` formula in the
+ *    block. Excel shifts the relative references to the target row on paste, so the total keeps working.
+ *    (An earlier version left it blank and relied on Values + Skip blanks; in real Excel that wiped the
+ *    workbook formula, so the paste no longer depends on Skip blanks.)
  */
 import { BANK_CATEGORY_IGNORE, BANK_CATEGORY_INTERNAL, BANK_LEDGER_SHEET, BANK_TRANSFER_SHEET, sanitizeCellText } from "@akaun/shared";
 import { colToIndex, indexToCol } from "../../office/address";
 import type { CellValue, WriteOp, WritePlan } from "../../office/dashboard/plan";
 import { AS_V2, normLabel } from "../../office/adapters/akaun-simple-v2/layout";
-import { senToRm, STATUS_MOVED, type LedgerRow } from "./ledger";
+import { senToRm, STATUS_MOVED, transferDescription, type LedgerRow } from "./ledger";
 
 export type TransferTarget = "deposits" | "payments";
 
@@ -136,15 +138,33 @@ export interface PreparedBlock {
 
 export class TransferBlockedError extends Error {}
 
-export function blockRow(layout: TargetLayout, r: LedgerRow, targetRow: number): CellValue[] {
+/** Template formulas for the "no" and "total" columns of the block, written on the transfer sheet. */
+export function blockFormulaOps(layout: TargetLayout, count: number): WriteOp[] {
+  const last = BLOCK_FIRST_ROW + count - 1;
+  const firstCat = indexToCol(Math.min(...Object.keys(layout.categories).map(colToIndex)));
+  const ops: WriteOp[] = [];
+  layout.leading.forEach((kind, i) => {
+    const col = indexToCol(i + 1);
+    const rows = Array.from({ length: count }, (_, k) => BLOCK_FIRST_ROW + k);
+    if (kind === "total") {
+      ops.push({ op: "formulas", sheet: BANK_TRANSFER_SHEET, address: `${col}${BLOCK_FIRST_ROW}:${col}${last}`, formulas: rows.map((r) => [`=SUM(${firstCat}${r}:${layout.lastCol}${r})`]) });
+    }
+    if (kind === "no") {
+      // Exactly what the Payments VBA form writes, so pasted rows look like form entries.
+      ops.push({ op: "formulas", sheet: BANK_TRANSFER_SHEET, address: `${col}${BLOCK_FIRST_ROW}:${col}${last}`, formulas: rows.map(() => ["=ROW()-5"]) });
+    }
+  });
+  return ops;
+}
+
+export function blockRow(layout: TargetLayout, r: LedgerRow): CellValue[] {
   const width = colToIndex(layout.lastCol);
   const out: CellValue[] = Array<CellValue>(width).fill("");
   const sen = layout.target === "deposits" ? r.inSen : r.outSen;
   layout.leading.forEach((kind, i) => {
-    if (kind === "no") out[i] = targetRow - 5;
     if (kind === "date") out[i] = r.dateSerial ?? "";
-    if (kind === "desc") out[i] = sanitizeCellText(r.description, 250);
-    // "total" stays blank: Skip blanks keeps the workbook's own SUM formula.
+    if (kind === "desc") out[i] = sanitizeCellText(transferDescription(r), 250);
+    // "no" and "total" are written as formulas by blockFormulaOps (template formulas, relative refs).
   });
   const col = categoryColumn(layout, r.category)!;
   out[colToIndex(col) - 1] = senToRm(sen);
@@ -164,24 +184,25 @@ export function prepareBlock(layout: TargetLayout, rows: LedgerRow[], state: Tar
   const width = colToIndex(layout.lastCol);
   const last = BLOCK_FIRST_ROW + rows.length - 1;
   const blockAddress = `A${BLOCK_FIRST_ROW}:${layout.lastCol}${last}`;
-  const values = rows.map((r, i) => blockRow(layout, r, state.nextRow + i));
+  const values = rows.map((r) => blockRow(layout, r));
   const headerRow: CellValue[] = Array.from({ length: width }, (_, i) => {
     const col = indexToCol(i + 1);
     const lead = layout.leading[i];
     if (lead === "no") return "No.";
     if (lead === "date") return "Tarikh";
     if (lead === "desc") return "Butiran";
-    if (lead === "total") return "(Jumlah: formula kekal)";
+    if (lead === "total") return "Jumlah (formula)";
     return sanitizeCellText(layout.categories[col] ?? "");
   });
   const dateCol = indexToCol(layout.leading.indexOf("date") + 1);
   const ops: WriteOp[] = [
     { op: "clear", sheet: BANK_TRANSFER_SHEET, address: "A1:AQ400" },
-    { op: "values", sheet: BANK_TRANSFER_SHEET, address: "A1:A2", values: [[`Blok untuk ${layout.sheet}`], [`Copy blok bertanda (${blockAddress}), kemudian di ${layout.sheet}!A${state.nextRow}: Paste Special → Values + Skip blanks. Lepas itu tekan "Sahkan Pindahan".`]] },
+    { op: "values", sheet: BANK_TRANSFER_SHEET, address: "A1:A2", values: [[`Blok untuk ${layout.sheet}`], [`Copy blok bertanda (${blockAddress}), kemudian di ${layout.sheet}!A${state.nextRow}: Paste Special → Formulas (Ctrl+Alt+V, F, Enter). Lepas itu tekan "Sahkan Pindahan".`]] },
     { op: "values", sheet: BANK_TRANSFER_SHEET, address: `A${META_ROW}:H${META_ROW}`, values: [["Sasaran", layout.sheet, "Baris mula", state.nextRow, "Bilangan", rows.length, "Status", "MENUNGGU PASTE"]] },
     { op: "values", sheet: BANK_TRANSFER_SHEET, address: `A4:${layout.lastCol}4`, values: [headerRow] },
     { op: "values", sheet: BANK_TRANSFER_SHEET, address: `${ID_COL}4`, values: [["ID Buku Bank"]] },
     { op: "values", sheet: BANK_TRANSFER_SHEET, address: blockAddress, values },
+    ...blockFormulaOps(layout, rows.length),
     { op: "values", sheet: BANK_TRANSFER_SHEET, address: `${ID_COL}${BLOCK_FIRST_ROW}:${ID_COL}${last}`, values: rows.map((r) => [r.id]) },
     { op: "format", sheet: BANK_TRANSFER_SHEET, address: "A1", style: { bold: true, fontSize: 13 } },
     { op: "format", sheet: BANK_TRANSFER_SHEET, address: `A4:${layout.lastCol}4`, style: { bold: true, fill: "#D9E1F2", wrap: true } },
@@ -223,24 +244,41 @@ export interface CellDiff {
 const asSen = (v: unknown) => (typeof v === "number" ? Math.round(v * 100) : NaN);
 const plain = (v: unknown) => (typeof v === "string" && v.startsWith("'") ? v.slice(1) : v);
 
-/** Compares the target rows with the block, cell by cell. Empty result = the paste is exactly right. */
-export function diffTransfer(p: PendingTransfer, target: unknown[][]): CellDiff[] {
+const normFormula = (f: unknown) => String(f ?? "").replace(/\$/g, "").replace(/\s/g, "").toUpperCase();
+
+/**
+ * Compares the target rows with the block, cell by cell. Empty result = the paste is exactly right.
+ * `formulas` is the target range read as formulas: the total column must hold the template formula for
+ * its own row (a pasted fixed number would silently stop updating), and Payments No. must equal row − 5.
+ */
+export function diffTransfer(p: PendingTransfer, target: unknown[][], formulas: unknown[][]): CellDiff[] {
   const diffs: CellDiff[] = [];
   const totalIdx = colToIndex(p.layout.totalCol) - 1;
-  const firstCat = Math.min(...Object.keys(p.layout.categories).map(colToIndex)) - 1;
+  const noIdx = p.layout.leading.indexOf("no");
+  const firstCatIdx = Math.min(...Object.keys(p.layout.categories).map(colToIndex));
   p.block.forEach((exp, i) => {
     const act = target[i] ?? [];
     const row = p.startRow + i;
-    const amountSen = exp.slice(firstCat).map(asSen).find((n) => Number.isFinite(n) && n > 0) ?? NaN;
+    const amountSen = exp.slice(firstCatIdx - 1).map(asSen).find((n) => Number.isFinite(n) && n > 0) ?? NaN;
     exp.forEach((e, c) => {
       const a = act[c];
       const col = indexToCol(c + 1);
+      if (c === totalIdx) {
+        const want = `=SUM(${indexToCol(firstCatIdx)}${row}:${p.layout.lastCol}${row})`;
+        const f = formulas[i]?.[c] ?? "";
+        if (normFormula(f) !== normFormula(want)) diffs.push({ row, col, expected: want, actual: f });
+        else if (asSen(a) !== amountSen) diffs.push({ row, col, expected: amountSen / 100, actual: a });
+        return;
+      }
+      if (c === noIdx) {
+        if (a !== row - 5) diffs.push({ row, col, expected: row - 5, actual: a });
+        return;
+      }
       let ok: boolean;
-      if (c === totalIdx) ok = asSen(a) === amountSen; // the workbook's SUM formula must now show the amount
-      else if (blank(e)) ok = blank(a) || a === 0;
+      if (blank(e)) ok = blank(a) || a === 0;
       else if (typeof e === "number") ok = asSen(a) === asSen(e);
       else ok = String(plain(a) ?? "").trim() === String(plain(e)).trim();
-      if (!ok) diffs.push({ row, col, expected: c === totalIdx ? amountSen / 100 : e, actual: a });
+      if (!ok) diffs.push({ row, col, expected: e, actual: a });
     });
   });
   return diffs;

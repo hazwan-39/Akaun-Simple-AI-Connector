@@ -119,8 +119,10 @@ export async function confirmTransfer(port: WorkbookPort): Promise<ConfirmOutcom
   const pending = await readPendingTransfer(read(port));
   if (!pending) return { ok: false, noPending: true };
   const end = pending.startRow + pending.count - 1;
-  const target = await port.readValues(pending.layout.sheet, `A${pending.startRow}:${pending.layout.lastCol}${end}`);
-  const diffs = diffTransfer(pending, target);
+  const address = `A${pending.startRow}:${pending.layout.lastCol}${end}`;
+  const target = await port.readValues(pending.layout.sheet, address);
+  const formulas = await port.readFormulas(pending.layout.sheet, address);
+  const diffs = diffTransfer(pending, target, formulas);
   if (diffs.length) return { ok: false, diffs };
   const ledger = await readLedger(read(port));
   await applyBankPlan(port, markMovedPlan(pending, ledger));

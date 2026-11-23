@@ -21,6 +21,8 @@ export interface WorkbookPort {
   isStructureProtected(): Promise<boolean>;
   /** Returns cell values (not formulas) for an A1 address on the named sheet. */
   readValues(sheet: string, address: string): Promise<unknown[][]>;
+  /** Returns cell formulas (constants as-is, formulas as "=...") for an A1 address. Read-only. */
+  readFormulas(sheet: string, address: string): Promise<unknown[][]>;
   /** Connector ownership tag stored on the worksheet, or null if none. */
   getOwnershipTag(sheet: string): Promise<string | null>;
 

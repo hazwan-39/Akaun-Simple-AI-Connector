@@ -69,17 +69,32 @@ export class InMemoryWorkbookPort implements WorkbookPort {
     for (let row = r.top; row <= r.bottom; row++) {
       const line: unknown[] = [];
       for (let col = r.left; col <= r.right; col++) {
-        const v = s.cells.get(`${indexToCol(col)}${row}`);
-        line.push(v === undefined ? "" : this.evaluate(s, v));
+        const ref = `${indexToCol(col)}${row}`;
+        const v = s.cells.get(ref);
+        line.push(v === undefined ? "" : this.evaluate(s, v, ref));
       }
       out.push(line);
     }
     return out;
   }
 
-  /** Like Excel, reading returns computed values. Only same-sheet =SUM(range) is modelled; other formulas return their text. */
-  private evaluate(s: MemorySheet, v: unknown): unknown {
+  async readFormulas(sheetName: string, address: string): Promise<unknown[][]> {
+    const s = this.sheet(sheetName);
+    if (!s) throw new Error(`Sheet not found: ${sheetName}`);
+    const r = parseAddress(address)!;
+    return Array.from({ length: r.bottom - r.top + 1 }, (_, i) =>
+      Array.from({ length: r.right - r.left + 1 }, (_, j) => s.cells.get(`${indexToCol(r.left + j)}${r.top + i}`) ?? ""),
+    );
+  }
+
+  /**
+   * Like Excel, reading returns computed values. Only same-sheet =SUM(range) and =ROW()±n are modelled;
+   * other formulas return their text. `ref` is the cell holding the formula.
+   */
+  private evaluate(s: MemorySheet, v: unknown, ref = ""): unknown {
     if (typeof v !== "string") return v;
+    const rowFn = /^=ROW\(\)\s*([+-]\s*\d+)?$/i.exec(v);
+    if (rowFn) return Number(/\d+$/.exec(ref)?.[0] ?? 0) + Number((rowFn[1] ?? "0").replace(/\s/g, ""));
     const m = /^=SUM\(([A-Z]+\d+:[A-Z]+\d+)\)$/i.exec(v);
     if (!m) return v;
     const rect = parseAddress(m[1]!)!;
@@ -97,19 +112,27 @@ export class InMemoryWorkbookPort implements WorkbookPort {
     this.selection = { sheet, address };
   }
 
-  /** Test helper: what the user does with Paste Special → Values + Skip blanks. */
-  pasteValuesSkipBlanks(fromSheet: string, fromAddress: string, toSheet: string, toTopLeft: string) {
+  /**
+   * Test helper: Paste Special → Formulas. Constants are copied as-is; formulas are copied with their
+   * relative row references shifted to the destination, as Excel does. Empty source cells clear the target.
+   */
+  pasteFormulas(fromSheet: string, fromAddress: string, toSheet: string, toTopLeft: string) {
     const src = this.sheet(fromSheet)!;
     const dst = this.sheet(toSheet)!;
     const from = parseAddress(fromAddress)!;
     const to = parseAddress(toTopLeft)!;
+    const dRow = to.top - from.top;
+    const dCol = to.left - from.left;
     for (let r = from.top; r <= from.bottom; r++)
       for (let c = from.left; c <= from.right; c++) {
         const v = src.cells.get(`${indexToCol(c)}${r}`);
-        if (v === undefined || v === "") continue;
-        dst.cells.set(`${indexToCol(to.left + c - from.left)}${to.top + r - from.top}`, v);
+        const ref = `${indexToCol(c + dCol)}${r + dRow}`;
+        if (v === undefined || v === "") dst.cells.delete(ref);
+        else if (typeof v === "string" && v.startsWith("=")) dst.cells.set(ref, v.replace(/(\$?)([A-Z]{1,3})(\$?)(\d+)/g, (_m, cAbs, col, rAbs, row) => `${cAbs}${col}${rAbs}${rAbs ? row : Number(row) + dRow}`));
+        else dst.cells.set(ref, v);
       }
   }
+
   async getOwnershipTag(sheetName: string) {
     return this.sheet(sheetName)?.props.get(OWNERSHIP_PROPERTY_KEY) ?? null;
   }

@@ -157,12 +157,12 @@ export function BankImportPage({ onBack }: { onBack: () => void }) {
     });
   }
 
-  /** Preview only: imitates the user's Paste Special → Values + Skip blanks. */
+  /** Preview only: imitates the user's Paste Special → Formulas. */
   async function onPreviewPaste() {
     if (!(port instanceof InMemoryWorkbookPort) || !summary?.pending) return;
     const { sheet, startRow, count } = summary.pending;
     const lastCol = sheet === "Deposits" ? "G" : "AO";
-    port.pasteValuesSkipBlanks(BANK_TRANSFER_SHEET, `A5:${lastCol}${4 + count}`, sheet, `A${startRow}`);
+    port.pasteFormulas(BANK_TRANSFER_SHEET, `A5:${lastCol}${4 + count}`, sheet, `A${startRow}`);
     setNotice(`(Pratonton) Blok telah "dipaste" ke ${sheet}!A${startRow}.`);
   }
 
@@ -243,7 +243,8 @@ export function BankImportPage({ onBack }: { onBack: () => void }) {
           <>
             <p className="small">
               Pilih kategori di lajur <strong>H</strong> sheet <strong>{BANK_LEDGER_SHEET}</strong>. Masuk → kategori Deposits, Keluar → kategori Payments. Guna
-              "Pindahan Dalaman" untuk pindahan antara akaun sendiri.
+              "Pindahan Dalaman" untuk pindahan antara akaun sendiri. Lajur <strong>N</strong> ialah butiran ringkas (≤ 43 aksara) yang akan masuk ke
+              Deposits/Payments. Ubah jika perlu. Butiran penuh kekal di lajur C.
             </p>
             <table className="kv">
               <tbody>
@@ -285,7 +286,8 @@ export function BankImportPage({ onBack }: { onBack: () => void }) {
                     <button className="link" onClick={() => void run(async () => void (await goToPasteCell(port)))}>Pergi ke sel</button>
                   </li>
                   <li>
-                    Klik kanan → <strong>Paste Special → Values</strong> dan tandakan <strong>Skip blanks</strong>. Jangan guna paste biasa: ia akan menimpa formula Jumlah.
+                    Klik kanan → <strong>Paste Special → Formulas</strong> (atau Ctrl+Alt+V, F, Enter). Blok sudah mengandungi formula Jumlah yang sama dengan template, dan
+                    Excel akan menyesuaikannya ke baris baharu. Jangan guna Paste Values: Jumlah akan jadi nombor tetap.
                   </li>
                   <li>Tekan Sahkan Pindahan.</li>
                 </ol>
