@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Skill | `BANK_IMPORT_001` v1.0.0 (Akaun Simple AI Connector) |
-| Status | **Draf untuk perbincangan.** Belum ada kod. |
+| Status | **Draf untuk perbincangan.** Belum ada kod. Tingkah laku VBA disemak (§11). |
 | Template sasaran | Akaun Simple 2026 **v2.26.02** sahaja |
 | Tarikh | 2026-11-23 |
 
@@ -47,7 +47,7 @@ Tiada amaun boleh tersalah lajur, kerana user pilih **kategori**, bukan lajur.
      contoh "Pendapatan sahaja");
    - susun ikut tarikh;
    - tulis blok ke sheet **Buku Bank – Pindah** dengan susunan lajur yang sama persis dengan sheet sasaran (§6);
-   - cari baris kosong pertama dalam sheet sasaran dan semak ruang cukup (§8);
+   - kira baris sasaran ikut cara form VBA (`COUNTA(lajur A) + 1`) dan semak ruang cukup (§8);
    - **select** blok tu supaya user hanya perlu tekan Ctrl+C. Select bukan pengubahsuaian.
 5. **Paste**: task pane beri arahan "Pergi ke **Deposits!A123** → Paste Special → **Values** + **Skip
    blanks**". Butang "Pergi ke baris" hanya select sel tu.
@@ -110,9 +110,11 @@ supaya *Skip blanks* mengekalkan formula workbook:
 | Sasaran | A | B | C | D | E… |
 |---|---|---|---|---|---|
 | Deposits | Tarikh | Butiran | *(kosong, formula `SUM(D:G)` kekal)* | Pendapatan… | …G Pinjaman |
-| Payments | No. *(lihat §11-1)* | Tarikh | Butiran | *(kosong, formula `SUM(E:AO)` kekal)* | E…AO kategori |
+| Payments | **No. = nombor baris − 5** (wajib diisi, lihat §11) | Tarikh | Butiran | *(kosong, formula `SUM(E:AO)` kekal)* | E…AO kategori |
 
 Amaun diletak di **satu** lajur kategori sahaja untuk setiap baris. Lajur kategori lain kosong.
+Tarikh ditulis sebagai **tarikh Excel sebenar** (nombor siri dengan format `dd/mm/yyyy`), bukan teks.
+**Lajur A tidak boleh kosong** dalam mana-mana baris blok, kerana form VBA bergantung padanya (§11).
 
 ### Sheet tersembunyi (dicipta oleh add-in)
 
@@ -136,7 +138,14 @@ Template: Deposits baris 6–365 (**360 baris**), Payments baris 6–364 (**359 
   Add-in tidak tambah baris sendiri.
 - beri amaran awal bila baki ruang kurang dari 10%.
 
-"Baris kosong" bermaksud tiada tarikh **dan** tiada amaun dalam mana-mana lajur kategori.
+**Baris sasaran = `COUNTA(lajur A) + 1`**, iaitu cara yang sama dengan form VBA (§11). Bukan "baris kosong
+pertama". Sebelum sediakan blok, add-in semak:
+
+- semua baris dari baris sasaran hingga baris terakhir blok mesti **kosong sepenuhnya** (lajur A, tarikh,
+  butiran dan semua lajur kategori);
+- **tiada data di bawah** baris sasaran. Data di bawah bermakna ada baris dengan lajur A kosong di tengah
+  jadual. Dalam keadaan ni, form VBA dan blok kita akan bertembung, jadi add-in berhenti dan tunjuk baris
+  yang bermasalah supaya user betulkan dulu.
 
 ## 9. API (server sedia ada)
 
@@ -159,22 +168,44 @@ cadangan kategori. Keperluan:
 - nombor akaun penuh dipotong kepada 4 digit akhir sebelum apa-apa dihantar;
 - kemas kini Privacy Policy (lihat `docs/marketplace-checklist.md`).
 
-## 11. Perkara yang mesti disahkan sebelum mula kod
+## 11. Tingkah laku VBA (disemak 2026-11-23)
 
-1. **Payments lajur A "No."**: adakah ia diisi oleh form VBA, dan adakah VBA mencari "baris kosong
-   seterusnya" guna lajur A? Kalau ya, baris yang dipaste dengan A kosong boleh **ditimpa** oleh entri form
-   seterusnya. Perlu semak tingkah laku butang VBA pada salinan workbook. Mungkin blok perlu isi No. secara
-   berturutan.
-2. Sama untuk Deposits: lajur mana yang VBA guna untuk cari baris kosong?
-3. Bila user paste, adakah ada macro `Worksheet_Change` yang berjalan?
-4. Bank mana dulu, dan dapatkan contoh CSV/PDF sebenar (data boleh dikaburkan).
-5. Bayaran balik pinjaman: ke `AO Term Loan` / `AN Hire Purchase`, dan termasuk faedah? Atau faedah ke
+Sumber: modul VBA yang diekstrak (baca sahaja) dari **salinan** `Akaun Simple 2026 v2.26.02.xlsm`.
+Fail asal tidak dibuka atau diubah. Kata laluan tidak dicari atau digunakan.
+
+| Soalan | Jawapan |
+|---|---|
+| Macam mana form cari baris seterusnya? | **`COUNTA(lajur A) + 1`**, sama untuk Deposits (`UserForm1`) dan Payments (`PaymentBank`). Baris 1–5 sentiasa terisi (nama bisnes, tajuk), jadi entri pertama jatuh di baris 6. |
+| Apa form tulis ke lajur A? | Deposits: tarikh. Payments: formula `=Row()-5` (No.). |
+| Risiko kalau lajur A kosong? | **Ya, risiko sebenar.** Baris yang dipaste tanpa lajur A tak dikira oleh `COUNTA`, jadi entri form seterusnya akan **menimpa** baris tersebut tanpa amaran. Sebab tu blok mesti isi lajur A (§6). |
+| Ada `Worksheet_Change` atau macro lain bila paste? | **Tiada.** Hanya `Worksheet_SelectionChange` kosong pada satu sheet. |
+| Adakah form unprotect sheet? | Tidak. Form hanya tulis ke sel unlocked, sama seperti paste user. |
+| Dropdown form | `Mapping!A1:A4` (Deposits) dan `Mapping!B1:B35` (Payments). |
+
+Penemuan tambahan:
+
+- **Form Payments tak boleh rekod `AJ Intengible Asset` dan `AK Kelengkapan Komputer`.** Senarai
+  `Mapping!B1:B35` hanya ada 35 kategori, sedangkan Payments ada 37 lajur. Dropdown Buku Bank diambil dari
+  tajuk lajur sebenar, jadi kedua-dua kategori ni tersedia dalam add-in.
+- Tajuk `T` ialah "Cas Kerajaan" tapi Mapping tulis "Caj Kerajaan". Add-in guna tajuk lajur, bukan Mapping.
+- Form tulis tarikh melalui `Format(..., "dd/mm/yyyy")` sebagai teks, yang boleh jadi tarikh tertukar
+  hari/bulan bergantung pada tetapan Windows. Data lama user mungkin ada tarikh teks atau tertukar. Engine
+  Fasa 1 dah laporkan tarikh tak sah, dan perkara ni perlu diambil kira bila uji dengan data sebenar.
+- `Workbook_Open` memaparkan mesej "File Sudah Expired" selepas **31 Disember 2026**. Versi template baru
+  dijangka selepas tarikh tu, dan setiap versi perlukan layout yang disahkan sendiri.
+
+## 12. Perkara yang masih perlu diputuskan
+
+1. Bank mana dulu, dan dapatkan contoh CSV/PDF sebenar (data boleh dikaburkan).
+2. Bayaran balik pinjaman: ke `AO Term Loan` / `AN Hire Purchase`, dan termasuk faedah? Atau faedah ke
    `AD Caj Faedah`? Ini keputusan perakaunan, dan mungkin satu transaksi perlu dipecah kepada dua kategori.
    Fasa 2a: **satu kategori setiap baris**. Pecahan ditangguh.
-6. Transaksi tunai (tiada dalam penyata) kekal dimasukkan secara manual. Pastikan user faham Buku Bank
+3. Transaksi tunai (tiada dalam penyata) kekal dimasukkan secara manual. Pastikan user faham Buku Bank
    bukan semua transaksi.
+4. Ujian manual dalam Excel: paste blok, kemudian tambah satu entri melalui form, dan sahkan entri tu masuk
+   di baris selepas blok, bukan menimpa.
 
-## 12. Ujian
+## 13. Ujian
 
 - Unit: parser setiap profil bank (fixture CSV dikaburkan), semakan baki, hash pendua, pembina blok
   (lajur betul, Jumlah kosong, satu amaun setiap baris), pengesanan baris kosong, kapasiti.
@@ -184,7 +215,7 @@ cadangan kategori. Keperluan:
 - **Manual dalam Excel** (salinan workbook): Paste Special Values + Skip blanks mengekalkan formula Jumlah,
   butang VBA masih betul selepas paste, dan simpan/buka semula `.xlsm`.
 
-## 13. Luar skop Fasa 2
+## 14. Luar skop Fasa 2
 
 - Add-in tulis terus ke Deposits/Payments.
 - Sambungan terus ke bank (open banking / FPX API).
