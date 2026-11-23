@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Skill | `BANK_IMPORT_001` v1.0.0 (Akaun Simple AI Connector) |
-| Status | **Draf untuk perbincangan.** Belum ada kod. Tingkah laku VBA disemak (§11). |
+| Status | Parser penyata siap dan diuji (§4.1–4.2). Buku Bank, blok paste dan task pane belum dibina. Tingkah laku VBA disemak (§11). |
 | Template sasaran | Akaun Simple 2026 **v2.26.02** sahaja |
 | Tarikh | 2026-11-23 |
 
@@ -60,12 +60,50 @@ Tiada amaun boleh tersalah lajur, kerana user pilih **kategori**, bukan lajur.
 
 | Format | Cara ekstrak | Fasa |
 |---|---|---|
-| CSV bank (Maybank, CIMB, Public Bank dulu) | Parser deterministik per bank dalam add-in. **Tiada AI, tiada data keluar.** | 2a |
-| PDF teks | Teks diekstrak dalam add-in (pdf.js). Teks dihantar ke API, dan AI pulangkan baris dalam JSON schema ketat. | 2a |
+| **PDF teks (e-statement rasmi bank)** | Parser deterministik dalam add-in: pdf.js + `parseBankStatement()` (`packages/shared/src/bank/`). **Tiada AI, tiada data keluar dari Excel.** | 2a |
+| PDF yang parser tak dapat sahkan | AI dengan JSON schema ketat, hanya dengan persetujuan user, dan hasilnya tetap melalui semakan §5 | 2b |
 | PDF imbasan / gambar | Model vision | 2b, kemudian |
+| CSV | Tiada dalam sampel. Tunggu permintaan user. | kemudian |
 
-Setiap profil bank menyatakan lajur tarikh/butiran/debit/kredit/baki, format tarikh dan format nombor
-(contoh `1,234.50 DR`). Kalau tajuk CSV tak sepadan dengan profil, add-in tolak fail dan tidak cuba meneka.
+### 4.1 Cara parser berfungsi
+
+Parser tidak bergantung pada nama lajur setiap bank. Setiap penyata bank Malaysia mencetak tarikh di kiri,
+amaun, dan baki berjalan di kanan. **Arah (masuk/keluar) diambil dari perubahan baki berjalan**. Tajuk
+lajur (Debit/Kredit/Pengeluaran/Simpanan) dan tanda (`-`, `DR`, `CR`, `+`) hanya digunakan bila baki
+tiada pada baris tersebut. Profil kecil setiap bank hanya simpan:
+
+- pengesanan bank (logo/nama di halaman 1);
+- format tarikh khas (contoh `ddmmyy` untuk Alliance);
+- kedudukan butiran (bawah atau atas baris bertarikh, contoh BSN di atas).
+
+Tahun yang tak dicetak (contoh `01FEB`, `03/03`, `Jul 07`) diambil dari tarikh atau tempoh penyata.
+Transaksi Disember dalam penyata Januari diletakkan dalam tahun sebelumnya. Kalau tempoh penyata tak
+dijumpai, parser **tidak meneka tahun** dan import disekat (`YEAR_UNKNOWN`).
+
+### 4.2 Keputusan terhadap sampel sebenar (2026-11-23)
+
+38 fail PDF dari 12 bank. Semuanya **PDF teks**, tiada imbasan. Diuji secara tempatan dengan
+`scripts/eval-bank-statements.mts`. **Fail sampel tidak disimpan dalam repo** kerana mengandungi data
+peribadi; unit test hanya guna data sintetik.
+
+| Bank | Fail | Lulus semakan baki | Nota |
+|---|---|---|---|
+| Maybank | 5 | 5 | |
+| CIMB | 5 | 5 | Jadual mata ganjaran di halaman 1 diabaikan |
+| Public Bank | 2 | 2 | Transaksi hari sama tanpa tarikh sendiri |
+| RHB | 4 | 4 | Dua format (2022 dan 2023/24) |
+| Hong Leong | 9 | 9 | Baki dicetak hanya di hujung hari, disemak pada setiap baki yang ada |
+| AmBank | 2 | 2 | Nombor dicetak per aksara, digabung semula |
+| Bank Islam | 4 | 2 | 2 fail ialah **eksport sejarah transaksi internet banking** tanpa baki berjalan, jadi tidak boleh disahkan |
+| Bank Muamalat | 1 | 1 | |
+| BSN | 3 | 3 | Butiran di atas baris bertarikh |
+| Alliance | 1 | 1 | Tarikh `ddmmyy` |
+| AFFIN | 1 | 0 | Sampel ialah **penyata kad kredit**, ditolak dengan betul. Perlu sampel akaun semasa/simpanan |
+| Bank Rakyat | 1 | 0 | Sampel ialah **Bank Rakyat Indonesia**, ditolak dengan betul. Perlu sampel Bank Rakyat Malaysia |
+| **Jumlah** | **38** | **34** | Semua 4 yang gagal ditolak dengan sebab yang jelas, bukan diimport dengan salah |
+
+Penyata yang gagal semakan **tidak diimport**. Task pane tunjuk sebab dan minta user muat turun
+e-statement rasmi bulanan (bukan eksport sejarah transaksi).
 
 ## 5. Semakan ketepatan (wajib sebelum tulis ke Buku Bank)
 
@@ -151,20 +189,21 @@ pertama". Sebelum sediakan blok, add-in semak:
 
 | Endpoint | Input | Output |
 |---|---|---|
-| `POST /api/v1/skills/BANK_IMPORT_001/extract` | teks PDF (had 1 MB, laluan ini sahaja) + nama bank | baris transaksi (JSON schema ketat) + baki awal/akhir |
 | `POST /api/v1/skills/BANK_IMPORT_001/categorize` | senarai `{id, butiran, amaun, arah}` (hanya baris tanpa Peraturan) + senarai kategori sah | `{id, kategori, keyakinan}`. Kategori mesti salah satu dari senarai, kalau tidak ditolak |
+| `POST /api/v1/skills/BANK_IMPORT_001/extract` (**2b sahaja**) | teks PDF (had 1 MB, laluan ini sahaja) + nama bank | baris transaksi (JSON schema ketat) + baki awal/akhir |
 
-- Laluan CSV tidak memanggil `/extract` langsung.
+- Fasa 2a **tidak perlukan `/extract`**: parser tempatan mengendalikan 12 bank (§4.2).
 - Auth, quota, rate limit, `store: false` dan log tanpa data adalah sama seperti Fasa 1.
 - Tiada transaksi disimpan di server.
 
 ## 10. Privasi
 
-Berbeza dengan Fasa 1: butiran transaksi (nama pihak lain, rujukan) **dihantar ke AI** untuk PDF dan untuk
-cadangan kategori. Keperluan:
+**Ekstrak penyata berlaku sepenuhnya dalam Excel** (§4.1). Fail PDF dan senarai transaksi tidak dihantar
+ke server untuk dibaca. Data hanya keluar untuk **cadangan kategori AI**, dan hanya butiran + amaun + arah
+bagi baris yang tiada Peraturan Kategori. Keperluan:
 
 - skrin persetujuan sekali bagi setiap workbook, yang terangkan apa dihantar dan ke penyedia AI mana;
-- pilihan **"Tanpa AI"**: CSV + Peraturan sahaja, kategori selebihnya diisi manual;
+- pilihan **"Tanpa AI"**: parser + Peraturan sahaja, kategori selebihnya diisi manual;
 - nombor akaun penuh dipotong kepada 4 digit akhir sebelum apa-apa dihantar;
 - kemas kini Privacy Policy (lihat `docs/marketplace-checklist.md`).
 
@@ -196,7 +235,8 @@ Penemuan tambahan:
 
 ## 12. Perkara yang masih perlu diputuskan
 
-1. Bank mana dulu, dan dapatkan contoh CSV/PDF sebenar (data boleh dikaburkan).
+1. Sampel tambahan: penyata akaun **AFFIN** (bukan kad kredit), **Bank Rakyat Malaysia**, dan
+   e-statement rasmi Bank Islam (bukan eksport internet banking).
 2. Bayaran balik pinjaman: ke `AO Term Loan` / `AN Hire Purchase`, dan termasuk faedah? Atau faedah ke
    `AD Caj Faedah`? Ini keputusan perakaunan, dan mungkin satu transaksi perlu dipecah kepada dua kategori.
    Fasa 2a: **satu kategori setiap baris**. Pecahan ditangguh.
