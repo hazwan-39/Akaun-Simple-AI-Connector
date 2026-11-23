@@ -28,4 +28,6 @@ export interface WorkbookPort {
   createOwnedSheet(name: string, opts: { hidden: boolean; ownershipTag: string }): Promise<void>;
   /** Executes a guarded write plan. */
   applyPlan(plan: GuardedPlan): Promise<void>;
+  /** Navigation only (activate + select). Allowed on any sheet because it changes no content. */
+  selectRange(sheet: string, address: string): Promise<void>;
 }

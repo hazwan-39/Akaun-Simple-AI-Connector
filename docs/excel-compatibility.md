@@ -8,6 +8,9 @@
 | Ownership tag on AI sheets | `worksheet.customProperties` | **1.12** | Worksheet creation disabled. Results shown in the task pane only |
 | Chart data from hidden sheet | `chart.plotVisibleOnly` | 1.8 | Covered by the 1.12 check |
 | Create/update charts | `charts.add`, `chart.setData` | 1.1 / 1.4 | n/a |
+| Buku Bank category dropdown | `range.dataValidation` (list from an `IF(...)` formula over `_AI_BANK_LISTS`) | 1.8 | Covered by the 1.12 check. **The IF-formula list source is unverified in real Excel** |
+| Select the paste block / go to paste cell | `range.select()`, `worksheet.activate()` | 1.1 | n/a |
+| Read statement PDF | pdf.js 4.10.38 in the task pane (bundled worker, no CDN) | n/a | Needs a WebView with module workers (Edge WebView2). Untested in Excel |
 
 The add-in checks `Office.context.requirements.isSetSupported()` at runtime (`src/office/host.ts`).
 

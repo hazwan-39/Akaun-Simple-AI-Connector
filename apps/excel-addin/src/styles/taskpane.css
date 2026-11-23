@@ -141,3 +141,14 @@ h4 { margin: 12px 0 4px; font-size: 13px; }
 .dialog { background: var(--card); border-radius: var(--radius); padding: 14px; max-width: 360px; width: 100%; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
 .dialog h3 { margin: 0 0 8px; font-size: 15px; }
 .dialog-body ul { padding-left: 18px; }
+
+/* Bank import */
+.kv { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12px; }
+.kv th { text-align: left; font-weight: 600; color: var(--muted); padding: 3px 8px 3px 0; width: 40%; }
+.kv td { padding: 3px 0; font-variant-numeric: tabular-nums; }
+.banner ul { margin: 4px 0 0; padding-left: 18px; }
+.steps { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+.steps ol { padding-left: 18px; margin: 0 0 8px; display: grid; gap: 4px; }
+.diffs { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.diffs th, .diffs td { border-bottom: 1px solid var(--line); padding: 3px 4px; text-align: left; }
+input[type="file"] { font: inherit; max-width: 100%; }

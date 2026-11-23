@@ -24,6 +24,16 @@ npm run build
 The workbook tests use `InMemoryWorkbookPort` and a fixture that reproduces the real v2.26.02 layout
 (`tests/fixtures/akaun-simple-v2.ts`). They do **not** run inside Excel.
 
+### Bank import (BANK_IMPORT_001)
+
+| Area | File |
+|---|---|
+| Statement parser: amounts, dates, layouts of 12 banks (synthetic), refusal cases | `tests/unit/bank-parser.test.ts` |
+| Buku Bank create/confirm, dedupe, dropdown, refusals; transfer block at COUNTA(A)+1, Payments No., Skip-blanks paste, verify diffs, capacity, gap in column A, guard | `tests/integration/bank-import.test.ts` |
+| Parser against real sample PDFs (local only, not in repo) | `npx tsx scripts/eval-bank-statements.mts "<folder>"` |
+
+Browser preview (outside Excel, DEV build, in-memory template, synthetic PDF) exercised the full flow: upload → import → categories → Deposits and Payments blocks → simulated paste → Sahkan Pindahan.
+
 ## NOT yet verified (manual, required before pilot)
 
 | Item | Status |
@@ -34,6 +44,7 @@ The workbook tests use `InMemoryWorkbookPort` and a fixture that reproduces the 
 | Real OpenAI / Anthropic calls with structured output | **Unverified**: no API keys used. Adapters tested against fake clients only |
 | Production adapter against a workbook with real transactions | **Pending**: only a blank template was available |
 | VBA behaviour after adding AI sheets | **Pending manual check** (below) |
+| Bank import in Excel: PDF upload in the WebView, category dropdown (IF-formula source), block selection, real Paste Special Values + Skip blanks into protected Deposits/Payments, then a VBA form entry lands after the pasted rows | **Unverified** |
 
 ## Manual workbook integrity checklist (use a COPY)
 

@@ -55,6 +55,11 @@ export class InMemoryWorkbookPort implements WorkbookPort {
   async isStructureProtected() {
     return this.structureProtected;
   }
+  /** Last navigation (selectRange or a "select" op). */
+  selection: { sheet: string; address: string } | null = null;
+  /** Data-validation sources per "sheet!address". */
+  readonly validations = new Map<string, string>();
+
   async readValues(sheetName: string, address: string): Promise<unknown[][]> {
     const s = this.sheet(sheetName);
     if (!s) throw new Error(`Sheet not found: ${sheetName}`);
@@ -65,11 +70,45 @@ export class InMemoryWorkbookPort implements WorkbookPort {
       const line: unknown[] = [];
       for (let col = r.left; col <= r.right; col++) {
         const v = s.cells.get(`${indexToCol(col)}${row}`);
-        line.push(v === undefined ? "" : v);
+        line.push(v === undefined ? "" : this.evaluate(s, v));
       }
       out.push(line);
     }
     return out;
+  }
+
+  /** Like Excel, reading returns computed values. Only same-sheet =SUM(range) is modelled; other formulas return their text. */
+  private evaluate(s: MemorySheet, v: unknown): unknown {
+    if (typeof v !== "string") return v;
+    const m = /^=SUM\(([A-Z]+\d+:[A-Z]+\d+)\)$/i.exec(v);
+    if (!m) return v;
+    const rect = parseAddress(m[1]!)!;
+    let sum = 0;
+    for (let r = rect.top; r <= rect.bottom; r++)
+      for (let c = rect.left; c <= rect.right; c++) {
+        const x = s.cells.get(`${indexToCol(c)}${r}`);
+        if (typeof x === "number") sum += x;
+      }
+    return Math.round(sum * 100) / 100;
+  }
+
+  async selectRange(sheet: string, address: string) {
+    if (!this.sheet(sheet)) throw new Error(`no sheet ${sheet}`);
+    this.selection = { sheet, address };
+  }
+
+  /** Test helper: what the user does with Paste Special → Values + Skip blanks. */
+  pasteValuesSkipBlanks(fromSheet: string, fromAddress: string, toSheet: string, toTopLeft: string) {
+    const src = this.sheet(fromSheet)!;
+    const dst = this.sheet(toSheet)!;
+    const from = parseAddress(fromAddress)!;
+    const to = parseAddress(toTopLeft)!;
+    for (let r = from.top; r <= from.bottom; r++)
+      for (let c = from.left; c <= from.right; c++) {
+        const v = src.cells.get(`${indexToCol(c)}${r}`);
+        if (v === undefined || v === "") continue;
+        dst.cells.set(`${indexToCol(to.left + c - from.left)}${to.top + r - from.top}`, v);
+      }
   }
   async getOwnershipTag(sheetName: string) {
     return this.sheet(sheetName)?.props.get(OWNERSHIP_PROPERTY_KEY) ?? null;
@@ -102,8 +141,10 @@ export class InMemoryWorkbookPort implements WorkbookPort {
         case "values":
           each(op.address, (ref, r, c) => {
             const v = op.values[r]![c]!;
+            // Writing "" leaves the cell empty in Excel.
+            if (v === "") s.cells.delete(ref);
             // Excel stores a leading apostrophe as a text prefix, not as content.
-            s.cells.set(ref, typeof v === "string" && v.startsWith("'") ? v.slice(1) : v);
+            else s.cells.set(ref, typeof v === "string" && v.startsWith("'") ? v.slice(1) : v);
           });
           break;
         case "formulas":
@@ -114,6 +155,12 @@ export class InMemoryWorkbookPort implements WorkbookPort {
           target.charts.set(op.name, { sourceSheet: op.sourceSheet, sourceAddress: op.sourceAddress, title: op.title, type: op.chartType });
           break;
         }
+        case "validationList":
+          this.validations.set(`${op.sheet}!${op.address}`, op.source);
+          break;
+        case "select":
+          this.selection = { sheet: op.sheet, address: op.address };
+          break;
         default:
           s.formats += 1;
       }

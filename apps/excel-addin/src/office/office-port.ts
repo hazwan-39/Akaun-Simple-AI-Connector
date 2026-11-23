@@ -81,6 +81,7 @@ export class OfficeWorkbookPort implements WorkbookPort {
       };
       const charts: Extract<WriteOp, { op: "chart" }>[] = [];
       let activate: string | null = null;
+      let select: Extract<WriteOp, { op: "select" }> | null = null;
 
       for (const op of plan.ops) {
         switch (op.op) {
@@ -108,8 +109,18 @@ export class OfficeWorkbookPort implements WorkbookPort {
           case "chart":
             charts.push(op);
             break;
+          case "validationList": {
+            const dv = ws(op.sheet).getRange(op.address).dataValidation;
+            dv.clear();
+            dv.rule = { list: { inCellDropDown: true, source: op.source } };
+            dv.errorAlert = { showAlert: true, style: Excel.DataValidationAlertStyle.stop, title: "Kategori", message: "Pilih kategori dari senarai." };
+            break;
+          }
           case "activate":
             activate = op.sheet;
+            break;
+          case "select":
+            select = op;
             break;
         }
       }
@@ -137,6 +148,21 @@ export class OfficeWorkbookPort implements WorkbookPort {
         }
       }
       if (activate) ws(activate).activate();
+      if (select) {
+        const s: Extract<WriteOp, { op: "select" }> = select;
+        ws(s.sheet).activate();
+        ws(s.sheet).getRange(s.address).select();
+      }
+      await ctx.sync();
+    });
+  }
+
+  /** Navigation only: activates a sheet and selects a range. Never changes cell contents. */
+  async selectRange(sheet: string, address: string): Promise<void> {
+    await Excel.run(async (ctx) => {
+      const ws = ctx.workbook.worksheets.getItem(sheet);
+      ws.activate();
+      ws.getRange(address).select();
       await ctx.sync();
     });
   }

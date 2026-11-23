@@ -10,7 +10,7 @@
  *    or uses a function outside the small developer whitelist
  *  - builds a chart from data outside connector-owned sheets
  */
-import { AI_DASHBOARD_SHEET, AI_DATA_SHEET, isFormulaLike } from "@akaun/shared";
+import { AI_DASHBOARD_SHEET, AI_DATA_SHEET, BANK_LEDGER_SHEET, BANK_LISTS_SHEET, BANK_TRANSFER_SHEET, isFormulaLike } from "@akaun/shared";
 import { parseAddress, rectSize, rectWithin, type CellRect } from "../address";
 import type { GuardedPlan, WriteOp, WritePlan } from "./plan";
 
@@ -24,6 +24,10 @@ export class WriteGuardError extends Error {
 export const SHEET_BOUNDS: Record<string, CellRect> = {
   [AI_DASHBOARD_SHEET]: parseAddress("A1:N90")!,
   [AI_DATA_SHEET]: parseAddress("A1:J40")!,
+  // Bank import (BANK_IMPORT_001)
+  [BANK_LEDGER_SHEET]: parseAddress("A1:M5001")!,
+  [BANK_TRANSFER_SHEET]: parseAddress("A1:AQ400")!,
+  [BANK_LISTS_SHEET]: parseAddress("A1:B80")!,
 };
 
 const ALLOWED_FUNCTIONS = new Set(["SUM", "IF", "IFERROR", "ROUND", "ABS", "MAX", "MIN", "AVERAGE", "COUNT", "ISNUMBER", "AND", "OR", "NOT"]);
@@ -102,6 +106,13 @@ function checkOp(op: WriteOp, allowed: ReadonlySet<string>) {
       checkAddress(op.sheet, op.topLeft);
       checkAddress(op.sheet, op.bottomRight);
       if (!/^AS_AI_[A-Za-z0-9_]{1,40}$/.test(op.name)) throw new WriteGuardError("chart name must use the AS_AI_ prefix");
+      return;
+    case "validationList":
+      checkAddress(op.sheet, op.address);
+      checkFormula(op.source, allowed);
+      return;
+    case "select":
+      checkAddress(op.sheet, op.address);
       return;
     case "activate":
       return;

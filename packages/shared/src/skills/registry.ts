@@ -1,4 +1,4 @@
-import { CASH_FLOW_SKILL_ID, CASH_FLOW_SKILL_VERSION } from "../constants.js";
+import { BANK_IMPORT_SKILL_ID, BANK_IMPORT_SKILL_VERSION, CASH_FLOW_SKILL_ID, CASH_FLOW_SKILL_VERSION } from "../constants.js";
 
 /**
  * AI Skill registry. Only CASH_FLOW_001 is implemented in Phase 1; the others
@@ -20,6 +20,14 @@ export const SKILLS: readonly SkillDefinition[] = [
     nameMs: "Cash Flow Intelligence",
     nameEn: "Cash Flow Intelligence",
     descriptionMs: "Analisis aliran masuk & keluar tunai, trend bulanan dan cadangan tindakan.",
+    status: "enabled",
+  },
+  {
+    id: BANK_IMPORT_SKILL_ID,
+    version: BANK_IMPORT_SKILL_VERSION,
+    nameMs: "Import Penyata Bank",
+    nameEn: "Bank Statement Import",
+    descriptionMs: "Baca e-statement PDF ke Buku Bank, pilih kategori, dan sediakan blok untuk Deposits / Payments.",
     status: "enabled",
   },
   { id: "PROFIT_001", version: "0.0.0", nameMs: "Profit Analysis", nameEn: "Profit Analysis", descriptionMs: "Analisis untung rugi.", status: "coming_soon" },
