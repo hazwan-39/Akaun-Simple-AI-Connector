@@ -29,7 +29,7 @@ The workbook tests use `InMemoryWorkbookPort` and a fixture that reproduces the 
 | Area | File |
 |---|---|
 | Statement parser: amounts, dates, layouts of 12 banks (synthetic), refusal cases | `tests/unit/bank-parser.test.ts` |
-| Buku Bank create/confirm, dedupe, dropdown, refusals; transfer block at COUNTA(A)+1, Payments No., Skip-blanks paste, verify diffs, capacity, gap in column A, guard | `tests/integration/bank-import.test.ts` |
+| Buku Bank create/confirm, dedupe, dropdown, refusals; transfer block at COUNTA(A)+1 with template formulas (`=SUM`, `=ROW()-5`), Paste Formulas, Values-paste and wiped-formula rejection, verify diffs, capacity, gap in column A, guard | `tests/integration/bank-import.test.ts` |
 | Parser against real sample PDFs (local only, not in repo) | `npx tsx scripts/eval-bank-statements.mts "<folder>"` |
 
 Browser preview (outside Excel, DEV build, in-memory template, synthetic PDF) exercised the full flow: upload → import → categories → Deposits and Payments blocks → simulated paste → Sahkan Pindahan.
@@ -44,7 +44,7 @@ Browser preview (outside Excel, DEV build, in-memory template, synthetic PDF) ex
 | Real OpenAI / Anthropic calls with structured output | **Unverified**: no API keys used. Adapters tested against fake clients only |
 | Production adapter against a workbook with real transactions | **Pending**: only a blank template was available |
 | VBA behaviour after adding AI sheets | **Pending manual check** (below) |
-| Bank import in Excel: PDF upload in the WebView, category dropdown (IF-formula source), block selection, real Paste Special Values + Skip blanks into protected Deposits/Payments, then a VBA form entry lands after the pasted rows | **Unverified** |
+| Bank import in Excel Desktop (2026-11-23, user-reported, on a workbook copy) | First run: import and transfer worked, but **Values + Skip blanks wiped the Deposits column C formula**. Fixed: the block now carries the template formulas and is pasted with Paste Special → Formulas. **Re-test reported successful**, covering the Deposits and Payments transfer with formulas kept, and a VBA form entry after the paste. Second issue: long bank descriptions overflowed the ~43-character Butiran column. Fixed with Buku Bank column N (automatic, editable short description); **re-test reported successful**. Only one workbook and one Excel build were tested, so a wider pilot is still needed |
 
 ## Manual workbook integrity checklist (use a COPY)
 

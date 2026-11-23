@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Skill | `BANK_IMPORT_001` v1.0.0 (Akaun Simple AI Connector) |
-| Status | Fasa 2a dibina: parser (§4), Buku Bank, blok paste, Sahkan Pindahan dan task pane. Diuji dengan ujian automatik dan pratonton pelayar. **Belum diuji dalam Excel sebenar.** Belum ada: cadangan kategori (Peraturan §7 dan AI). |
+| Status | Fasa 2a dibina: parser (§4), Buku Bank, blok paste, Sahkan Pindahan dan task pane. Diuji dengan ujian automatik, pratonton pelayar, dan **dalam Excel Desktop oleh user pada salinan workbook (2026-11-23)**, selepas pembetulan paste formula. Belum ada: cadangan kategori (Peraturan §7 dan AI). |
 | Template sasaran | Akaun Simple 2026 **v2.26.02** sahaja |
 | Tarikh | 2026-11-23 |
 
@@ -49,8 +49,8 @@ Tiada amaun boleh tersalah lajur, kerana user pilih **kategori**, bukan lajur.
    - tulis blok ke sheet **Buku Bank – Pindah** dengan susunan lajur yang sama persis dengan sheet sasaran (§6);
    - kira baris sasaran ikut cara form VBA (`COUNTA(lajur A) + 1`) dan semak ruang cukup (§8);
    - **select** blok tu supaya user hanya perlu tekan Ctrl+C. Select bukan pengubahsuaian.
-5. **Paste**: task pane beri arahan "Pergi ke **Deposits!A123** → Paste Special → **Values** + **Skip
-   blanks**". Butang "Pergi ke baris" hanya select sel tu.
+5. **Paste**: task pane beri arahan "Pergi ke **Deposits!A123** → Paste Special → **Formulas**"
+   (Ctrl+Alt+V, F, Enter). Butang "Pergi ke baris" hanya select sel tu.
 6. **Sahkan pindahan**: add-in **baca** baris sasaran dan banding dengan blok: tarikh, butiran dan amaun
    setiap lajur kategori, serta Jumlah yang dikira oleh formula workbook sendiri.
    - Kalau semua sama: baris Buku Bank ditanda *Dipindah → Deposits!123*.
@@ -136,19 +136,33 @@ baris mana. Tiada "anggaran".
 | K | Status: Baru → Disahkan → Dipindah · Abaikan · Pindahan Dalaman | add-in / user |
 | L | Dipindah ke (contoh `Deposits!123`) | add-in |
 | M | Catatan | user |
+| N | **Butiran ringkas** (teks yang masuk ke Butiran Deposits/Payments) | add-in mengisi, user boleh ubah |
 
-User hanya mengedit H dan M. Bila user tukar H, add-in tukar K kepada *Disahkan* selepas user tekan
+**Butiran ringkas:** lajur Butiran dalam template hanya ~43 aksara lebar tanpa wrap text
+(Deposits B, Payments C), sedangkan butiran bank selalunya 60–90 aksara. Add-in mengisi N secara
+automatik (`shortDescription()`): nombor rujukan, nombor kad dan tarikh dibuang, manakala jenis transaksi
+dan nama pihak lain dikekalkan, maksimum 43 aksara. Blok pindah guna N, atau bentuk automatik jika N
+kosong. Butiran penuh kekal di lajur C. Add-in tidak mengubah lebar atau wrap sheet asal.
+
+User hanya mengedit H, M dan N. Bila user tukar H, add-in tukar K kepada *Disahkan* selepas user tekan
 **Sahkan**, bukan secara automatik semasa menaip.
 
 ### Buku Bank – Pindah (dicipta oleh add-in)
 
-Blok untuk dicopy. Susunan lajur **sama persis** dengan sasaran. **Lajur Jumlah dibiarkan kosong**
-supaya *Skip blanks* mengekalkan formula workbook:
+Blok untuk dicopy. Susunan lajur **sama persis** dengan sasaran. Lajur Jumlah dan No. mengandungi
+**formula yang sama dengan template**, dengan rujukan relatif, dan user paste guna **Paste Special →
+Formulas**. Excel akan menyesuaikan formula ke baris sasaran:
 
 | Sasaran | A | B | C | D | E… |
 |---|---|---|---|---|---|
-| Deposits | Tarikh | Butiran | *(kosong, formula `SUM(D:G)` kekal)* | Pendapatan… | …G Pinjaman |
-| Payments | **No. = nombor baris − 5** (wajib diisi, lihat §11) | Tarikh | Butiran | *(kosong, formula `SUM(E:AO)` kekal)* | E…AO kategori |
+| Deposits | Tarikh | Butiran | `=SUM(D5:G5)` → jadi `=SUM(D6:G6)` di baris 6 | Pendapatan… | …G Pinjaman |
+| Payments | `=ROW()-5` (sama dengan form VBA, lihat §11) | Tarikh | Butiran | `=SUM(E5:AO5)` | E…AO kategori |
+
+> **Pengajaran dari ujian Excel sebenar (2026-11-23):** versi pertama membiarkan lajur Jumlah kosong
+> dan bergantung pada Paste Special → Values + **Skip blanks**. Dalam Excel sebenar formula Jumlah di
+> Deposits lajur C **hilang** selepas paste. Sebab itu blok kini membawa formula sendiri, dan
+> **Sahkan Pindahan** membaca formula sasaran: Jumlah mesti `=SUM(D{baris}:G{baris})`. Nombor tetap
+> (contohnya hasil Paste Values) ditolak walaupun nilainya betul.
 
 Amaun diletak di **satu** lajur kategori sahaja untuk setiap baris. Lajur kategori lain kosong.
 Tarikh ditulis sebagai **tarikh Excel sebenar** (nombor siri dengan format `dd/mm/yyyy`), bukan teks.
@@ -252,8 +266,8 @@ Penemuan tambahan:
 - Integrasi (`InMemoryWorkbookPort`): Deposits/Payments **tidak berubah** selepas setiap langkah add-in.
   Sahkan pindahan mengesan beza (lajur salah, baris tertinggal, formula Jumlah ditimpa).
 - API: schema extract/categorize, kategori luar senarai ditolak, had saiz, quota.
-- **Manual dalam Excel** (salinan workbook): Paste Special Values + Skip blanks mengekalkan formula Jumlah,
-  butang VBA masih betul selepas paste, dan simpan/buka semula `.xlsm`.
+- **Manual dalam Excel** (salinan workbook): Paste Special → Formulas menghasilkan `=SUM(...)` yang betul
+  untuk setiap baris, butang VBA masih betul selepas paste, dan simpan/buka semula `.xlsm`.
 
 ## 14. Luar skop Fasa 2
 

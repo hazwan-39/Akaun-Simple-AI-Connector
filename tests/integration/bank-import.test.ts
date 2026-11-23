@@ -138,7 +138,7 @@ describe("bank import: transfer to Deposits / Payments", () => {
     return port;
   }
 
-  it("builds a Deposits block at COUNTA(A)+1 with the total column blank, then verifies the paste", async () => {
+  it("builds a Deposits block at COUNTA(A)+1 carrying the template SUM formula, then verifies the paste", async () => {
     const port = await categorised();
     const before = port.snapshot("Deposits");
     const prep = await prepareTransfer(port, "deposits");
@@ -146,10 +146,11 @@ describe("bank import: transfer to Deposits / Payments", () => {
     expect(prep).toMatchObject({ count: 2, blockAddress: "A5:G6", pasteAt: "Deposits!A6" });
     expect(port.selection).toEqual({ sheet: BANK_TRANSFER_SHEET, address: "A5:G6" });
     const t = port.sheet(BANK_TRANSFER_SHEET)!.cells;
-    expect([t.get("A5"), t.get("B5"), t.get("C5"), t.get("D5"), t.get("E5")]).toEqual([isoToSerial("2026-03-02"), "DUITNOW QR SALE", undefined, 250, undefined]);
+    expect([t.get("A5"), t.get("B5"), t.get("C5"), t.get("D5"), t.get("E5")]).toEqual([isoToSerial("2026-03-02"), "DUITNOW QR SALE", "=SUM(D5:G5)", 250, undefined]);
 
-    port.pasteValuesSkipBlanks(BANK_TRANSFER_SHEET, "A5:G6", "Deposits", "A6");
-    expect(port.sheet("Deposits")!.cells.get("C6")).toBe("=SUM(D6:G6)"); // Skip blanks kept the workbook formula
+    port.pasteFormulas(BANK_TRANSFER_SHEET, "A5:G6", "Deposits", "A6");
+    expect(port.sheet("Deposits")!.cells.get("C6")).toBe("=SUM(D6:G6)"); // Excel shifts the template formula to the target row
+    expect(port.sheet("Deposits")!.cells.get("C7")).toBe("=SUM(D7:G7)");
     const done = await confirmTransfer(port);
     expect(done).toEqual({ ok: true, moved: 2, sheet: "Deposits" });
     const ledger = port.sheet(BANK_LEDGER_SHEET)!.cells;
@@ -159,25 +160,59 @@ describe("bank import: transfer to Deposits / Payments", () => {
     expect((await ledgerSummary(port, true)).readyIn).toBe(0);
   });
 
-  it("fills Payments column A with No. = row − 5 so the VBA form does not overwrite the rows", async () => {
+  it("transfers the short Butiran (column N), keeps the full text in Buku Bank, and respects user edits", async () => {
+    const port = workbook();
+    const long = statement([
+      { date: "2026-03-02", description: "DUITNOW QR SALE 20260302M0000061861 CUSTOMER WITH A VERY LONG NAME SDN BHD 2603021448243324", amountSen: 25000, direction: "in", balanceSen: null },
+      { date: "2026-03-03", description: "IBG CREDIT 20260303ABCDE12345 ANOTHER CUSTOMER", amountSen: 1000, direction: "in", balanceSen: null },
+    ]);
+    await importStatement(port, long, "Maybank", opts);
+    const L = port.sheet(BANK_LEDGER_SHEET)!.cells;
+    expect(L.get("C2")).toContain("2603021448243324"); // full description kept
+    expect(L.get("N2")).toBe("DUITNOW QR SALE CUSTOMER WITH A VERY LONG");
+    expect(String(L.get("N2")).length).toBeLessThanOrEqual(43);
+    L.set("N3", "Jualan pelanggan B"); // user edit wins
+    setCategory(port, 2, "Pendapatan / Revenue");
+    setCategory(port, 3, "Pendapatan / Revenue");
+    await prepareTransfer(port, "deposits");
+    const t = port.sheet(BANK_TRANSFER_SHEET)!.cells;
+    expect([t.get("B5"), t.get("B6")]).toEqual(["DUITNOW QR SALE CUSTOMER WITH A VERY LONG", "Jualan pelanggan B"]);
+    port.pasteFormulas(BANK_TRANSFER_SHEET, "A5:G6", "Deposits", "A6");
+    expect(await confirmTransfer(port)).toMatchObject({ ok: true, moved: 2 });
+  });
+
+  it("fills Payments column A with the form's =ROW()-5 so the VBA form does not overwrite the rows", async () => {
     const port = await categorised();
     const prep = await prepareTransfer(port, "payments");
     expect(prep).toMatchObject({ count: 2, pasteAt: "Payments!A6", blockAddress: "A5:AO6" });
     const t = port.sheet(BANK_TRANSFER_SHEET)!.cells;
-    expect([t.get("A5"), t.get("A6")]).toEqual([1, 2]);
+    expect([t.get("A5"), t.get("A6")]).toEqual(["=ROW()-5", "=ROW()-5"]);
+    expect([t.get("D5"), t.get("D6")]).toEqual(["=SUM(E5:AO5)", "=SUM(E6:AO6)"]);
     expect(t.get("M5")).toBe(123.45); // Bil Utiliti
     expect(t.get("AC6")).toBe(0.5); // Caj Bank
-    expect(t.get("D5")).toBeUndefined();
-    port.pasteValuesSkipBlanks(BANK_TRANSFER_SHEET, "A5:AO6", "Payments", "A6");
+    port.pasteFormulas(BANK_TRANSFER_SHEET, "A5:AO6", "Payments", "A6");
+    expect((await port.readValues("Payments", "A6:A7")).flat()).toEqual([1, 2]);
     expect(await confirmTransfer(port)).toEqual({ ok: true, moved: 2, sheet: "Payments" });
   });
 
-  it("does not mark anything when the paste is wrong (normal paste over the total formula, wrong column)", async () => {
+  it("rejects a Values paste: the total becomes a fixed number instead of the template formula", async () => {
     const port = await categorised();
     await prepareTransfer(port, "deposits");
-    port.pasteValuesSkipBlanks(BANK_TRANSFER_SHEET, "A5:G6", "Deposits", "A6");
+    port.pasteFormulas(BANK_TRANSFER_SHEET, "A5:G6", "Deposits", "A6");
     const dep = port.sheet("Deposits")!.cells;
-    dep.set("C6", ""); // what an ordinary paste does to the formula
+    dep.set("C6", 250); // what Paste Values leaves: right number, formula gone
+    const r = await confirmTransfer(port);
+    expect(r.ok).toBe(false);
+    if (!r.ok && "diffs" in r) expect(r.diffs).toEqual([{ row: 6, col: "C", expected: "=SUM(D6:G6)", actual: 250 }]);
+    expect(port.sheet(BANK_LEDGER_SHEET)!.cells.get("K2")).toBe("Baru");
+  });
+
+  it("does not mark anything when the paste is wrong (formula wiped, wrong column)", async () => {
+    const port = await categorised();
+    await prepareTransfer(port, "deposits");
+    port.pasteFormulas(BANK_TRANSFER_SHEET, "A5:G6", "Deposits", "A6");
+    const dep = port.sheet("Deposits")!.cells;
+    dep.delete("C6"); // the problem seen in real Excel with Values + Skip blanks
     dep.set("E7", dep.get("D7")!);
     dep.delete("D7");
     const r = await confirmTransfer(port);
