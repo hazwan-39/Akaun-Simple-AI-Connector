@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Skill | `BANK_IMPORT_001` v1.0.0 (Akaun Simple AI Connector) |
-| Status | Parser penyata siap dan diuji (§4.1–4.2). Buku Bank, blok paste dan task pane belum dibina. Tingkah laku VBA disemak (§11). |
+| Status | Fasa 2a dibina: parser (§4), Buku Bank, blok paste, Sahkan Pindahan dan task pane. Diuji dengan ujian automatik dan pratonton pelayar. **Belum diuji dalam Excel sebenar.** Belum ada: cadangan kategori (Peraturan §7 dan AI). |
 | Template sasaran | Akaun Simple 2026 **v2.26.02** sahaja |
 | Tarikh | 2026-11-23 |
 

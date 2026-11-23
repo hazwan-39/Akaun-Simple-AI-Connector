@@ -20,6 +20,18 @@ export type OwnedSheetRole = "dashboard" | "data";
 export const ownershipToken = (sheetRole: OwnedSheetRole) =>
   `${CONNECTOR_ID}:${CASH_FLOW_SKILL_ID}:${sheetRole}`;
 
+/** Bank statement import skill (Phase 2). */
+export const BANK_IMPORT_SKILL_ID = "BANK_IMPORT_001" as const;
+export const BANK_IMPORT_SKILL_VERSION = "1.0.0" as const;
+export const BANK_LEDGER_SHEET = "Buku Bank";
+export const BANK_TRANSFER_SHEET = "Buku Bank - Pindah";
+export const BANK_LISTS_SHEET = "_AI_BANK_LISTS";
+export type BankSheetRole = "ledger" | "transfer" | "lists";
+export const bankOwnershipToken = (sheetRole: BankSheetRole) => `${CONNECTOR_ID}:${BANK_IMPORT_SKILL_ID}:${sheetRole}`;
+/** Categories every bank row can take besides the Deposits/Payments columns. Never transferred. */
+export const BANK_CATEGORY_INTERNAL = "Pindahan Dalaman";
+export const BANK_CATEGORY_IGNORE = "Abaikan";
+
 /** Maximum number of months in one reporting period (fixed template capacity). */
 export const MAX_PERIOD_MONTHS = 24;
 

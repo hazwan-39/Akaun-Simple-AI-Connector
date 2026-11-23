@@ -58,7 +58,7 @@ export function buildAkaunSimpleV2(opts: FixtureOptions = {}): InMemoryWorkbookP
 
   // ---- Deposits ----
   const dep: Record<string, unknown> = {
-    A1: "=Utama!F5", A3: "Bookkeeping", A4: "Penerimaan Tunai & Bank",
+    A1: "=Utama!F5", A2: "=Utama!F6", A3: "Bookkeeping", A4: "Penerimaan Tunai & Bank",
     A5: "Tarikh", B5: "Butiran", C5: "Jumlah Deposit (RM)", D5: "Pendapatan / Revenue",
     E5: "Modal Pemilik & Rakan Kongsi", F5: "Refunds", G5: "Pinjaman",
   };
@@ -79,7 +79,7 @@ export function buildAkaunSimpleV2(opts: FixtureOptions = {}): InMemoryWorkbookP
   port.addSheet("Deposits", { cells: dep, protected: true });
 
   // ---- Payments ----
-  const pay: Record<string, unknown> = { A1: "=Utama!F5", A3: "Bookkeeping", A4: "Pembayaran Tunai & Bank" };
+  const pay: Record<string, unknown> = { A1: "=Utama!F5", A2: "=Utama!F6", A3: "Bookkeeping", A4: "Pembayaran Tunai & Bank" };
   for (const [col, v] of Object.entries(PAYMENT_HEADERS)) pay[`${col}5`] = v;
   for (const [col, v] of Object.entries(PAYMENT_GROUPS)) pay[`${col}4`] = v;
   let paySum = 0;

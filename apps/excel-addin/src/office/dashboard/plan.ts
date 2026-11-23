@@ -33,7 +33,11 @@ export type WriteOp =
       topLeft: string;
       bottomRight: string;
     }
-  | { op: "activate"; sheet: string };
+  /** In-cell dropdown whose list comes from a formula over a connector-owned sheet. */
+  | { op: "validationList"; sheet: string; address: string; source: string }
+  | { op: "activate"; sheet: string }
+  /** Select a range on a connector-owned sheet (so the user can press Ctrl+C). */
+  | { op: "select"; sheet: string; address: string };
 
 export interface WritePlan {
   ops: WriteOp[];
